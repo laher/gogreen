@@ -1,0 +1,49 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "format": "prettier --write .",
+    "check": "prettier --check .",
+    "lint": "xo && prettier --check ."
+  },
+  "dependencies": {
+    "@vueuse/core": "^10.7.0",
+    "naive-ui": "^2.35.0",
+    "pinia": "^2.1.7",
+    "vue": "^3.3.10",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@babel/types": "^7.23.5",
+    "@typescript-eslint/eslint-plugin": "^6.13.2",
+    "@typescript-eslint/parser": "^6.13.2",
+    "@vicons/fa": "^0.12.0",
+    "@vicons/utils": "^0.1.4",
+    "@vitejs/plugin-vue": "^4.5.1",
+    "@vue/eslint-config-typescript": "^12.0.0",
+    "@vue/tsconfig": "^0.4.0",
+    "eslint": "8.55",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-config-xo": "^0.43.1",
+    "eslint-config-xo-typescript": "^1.0.1",
+    "eslint-plugin-prettier": "^5.0.1",
+    "eslint-plugin-vue": "^9.19.2",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.3",
+    "vfonts": "^0.0.3",
+    "vite": "^5.0.6",
+    "vue-eslint-parser": "^9.3.2",
+    "vue-tsc": "^2.0.29",
+    "xo": "^0.56.0"
+  },
+  "xo": {
+    "semicolon": false,
+    "space": 2,
+    "prettier": true
+  }
+}
