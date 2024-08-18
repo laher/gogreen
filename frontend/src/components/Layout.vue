@@ -2,7 +2,7 @@
 import { reactive } from 'vue'
 import { Run, List, Chdir, StopFSNotify, StartFSNotify } from '../../wailsjs/go/main/App'
 import { main } from '../../wailsjs/go/models'
-import Test from './Test.vue'
+import Output from './Output.vue'
 
 const data = reactive({
   pkg: './samples/pass',
@@ -14,7 +14,14 @@ const data = reactive({
 
 function list() {
   List().then(list => {
-    data.list = list.map(p => { return { value: p, label: p } })
+    data.list = list.map(value => {
+      let label = value
+      if (label.length > 15) {
+        const parts = label.split('/')
+        label = parts[parts.length - 1]
+      }
+      return { value, label }
+    })
     data.pkg = './...'
   }).catch(err => {
     console.log('list dirs error', err)
@@ -68,7 +75,7 @@ function test() {
 }
 </script>
 <template>
-  <n-main>
+  <main>
     <n-layout style="height: 768px">
       <n-layout-header style="height: 64px; padding: 24px; background-color: #FFD230" bordered>
         <n-row gutter="12">
@@ -92,14 +99,11 @@ function test() {
 
       <n-layout position="absolute" style="top: 64px; bottom: 64px" has-sider>
         <n-layout-sider content-style="padding: 24px;" :native-scrollbar="false" collapse-mode="transform"
-          :collapsed-width="120" :width="240" show-trigger="arrow-circle" bordered>
+          :collapsed-width="120" :width="340" show-trigger="arrow-circle" bordered>
           <n-h2>Options</n-h2>
           <n-card>
             <n-input-group>
-
-              <n-dropdown trigger="hover" v-model:value="data.pkg" :options="data.list">
-                <n-button>Package</n-button>
-              </n-dropdown>
+              <n-select v-model:value="data.pkg" :options="data.list" />
             </n-input-group>
             <n-input-group>
               <n-button primary @click="chdir">Chdir</n-button>
@@ -117,12 +121,12 @@ function test() {
           </n-card>
         </n-layout-sider>
         <n-layout content-style="padding: 24px; min-height:600px" :native-scrollbar="false">
-          <Test />
+          <Output />
         </n-layout>
       </n-layout>
       <n-layout-footer position="absolute" style="height: 64px; padding: 24px" bordered>
         <i>Run your tests like the moon pulls the tides - always</i>
       </n-layout-footer>
     </n-layout>
-  </n-main>
+  </main>
 </template>
