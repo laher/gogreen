@@ -4,7 +4,10 @@ go 1.21
 
 toolchain go1.22.4
 
-require github.com/wailsapp/wails/v2 v2.9.1
+require (
+	github.com/fsnotify/fsnotify v1.4.9
+	github.com/wailsapp/wails/v2 v2.9.1
+)
 
 require (
 	github.com/bep/debounce v1.2.1 // indirect

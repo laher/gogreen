@@ -13,3 +13,11 @@ export function List() {
 export function Run(arg1) {
   return window['go']['main']['App']['Run'](arg1);
 }
+
+export function StartFSNotify(arg1) {
+  return window['go']['main']['App']['StartFSNotify'](arg1);
+}
+
+export function StopFSNotify() {
+  return window['go']['main']['App']['StopFSNotify']();
+}

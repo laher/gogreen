@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -54,6 +55,55 @@ func (a *App) List() ([]string, error) {
 	lines = append(lines, strings.Split(string(out), "\n")...)
 	lines = lines[:len(lines)-1]
 	return lines, err
+}
+
+func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, err
+	}
+
+	watcher.Add(".")
+
+	// Start listening for events.
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				runtime.LogDebugf(a.ctx, "watch event: %+v", event)
+				// TODO - debounce?
+				s, err := a.Run(p)
+				if err != nil {
+
+					runtime.LogErrorf(a.ctx, "error running tests: %s", err)
+					continue
+				}
+				runtime.LogDebugf(a.ctx, "ran tests: %s", s)
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				runtime.LogErrorf(a.ctx, "watch error: %s", err)
+			}
+		}
+	}()
+	return watcher, nil
+}
+
+func (a *App) StartFSNotify(p TestParams) (string, error) {
+	_, err := a.fsnotify(p)
+	if err != nil {
+		return "", err
+	}
+	// run once to start things off
+	return a.Run(p)
+}
+
+func (a *App) StopFSNotify() error {
+	return nil
 }
 
 // Run returns a greeting for the given name

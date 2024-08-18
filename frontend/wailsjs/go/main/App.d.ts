@@ -7,3 +7,7 @@ export function Chdir():Promise<string>;
 export function List():Promise<Array<string>>;
 
 export function Run(arg1:main.TestParams):Promise<string>;
+
+export function StartFSNotify(arg1:main.TestParams):Promise<string>;
+
+export function StopFSNotify():Promise<void>;

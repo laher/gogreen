@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import Test from './components/Test.vue'
+import Layout from './components/Layout.vue'
 import { NConfigProvider } from "naive-ui";
 import type { GlobalThemeOverrides } from "naive-ui";
 
@@ -7,22 +7,22 @@ import type { GlobalThemeOverrides } from "naive-ui";
 //  import { NThemeEditor } from 'naive-ui'
 
 const themeOverrides: GlobalThemeOverrides = {
-  common: {
-    primaryColor: "#008deb",
-  },
-  Button: {
-    borderFocus: "1px solid #0082e0",
-    borderHover: "1px solid #0082e0",
-    textColorHover: "#0082e0",
-    textColorFocus: "#0082e0",
-    colorPrimary: "#008deb",
-    colorHoverPrimary: "#0082e0",
-    colorFocusPrimary: "#0082e0",
-  },
-  Input: {
-    borderFocus: "1px solid #008deb",
-    borderHover: "1px solid #008deb",
-  },
+  // common: {
+  //   primaryColor: "#008deb",
+  // },
+  // Button: {
+  //   borderFocus: "1px solid #0082e0",
+  //   borderHover: "1px solid #0082e0",
+  //   textColorHover: "#0082e0",
+  //   textColorFocus: "#0082e0",
+  //   colorPrimary: "#008deb",
+  //   colorHoverPrimary: "#0082e0",
+  //   colorFocusPrimary: "#0082e0",
+  // },
+  // Input: {
+  //   borderFocus: "1px solid #008deb",
+  //   borderHover: "1px solid #008deb",
+  // },
 };
 
 </script>
@@ -34,7 +34,7 @@ const themeOverrides: GlobalThemeOverrides = {
       <n-message-provider>
         <n-notification-provider>
           <n-dialog-provider>
-            <Test />
+            <Layout />
             <n-global-style />
           </n-dialog-provider>
         </n-notification-provider>
