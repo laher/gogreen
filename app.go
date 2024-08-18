@@ -94,11 +94,20 @@ func (a *App) Run(p TestParams) (string, error) {
 		}
 
 		if err := scanner.Err(); err != nil {
-			runtime.LogWarningf(a.ctx, "err scanning stdoutpipe: %s", err)
+			runtime.LogWarningf(a.ctx, "err scanning %s: %s", name, err)
+			runtime.EventsEmit(a.ctx, "err:scan."+name, err)
 		}
 	}
 	go f("stdout", stdout)
 	go f("stderr", stderr)
+	go func() {
+		err := cmd.Wait()
+		if err != nil {
+			// TODO publish some error
+			runtime.EventsEmit(a.ctx, "err:cmdwait", err)
+		}
+		runtime.EventsEmit(a.ctx, "done")
+	}()
 	//	runtime.LogDebugf(a.ctx, "got %d bytes of data", len(stdoutStderr))
 	//	runtime.LogDebugf(a.ctx, "%s", string(stdoutStderr))
 	return `{"Action": "test", "Package": "` + p.Pkg + `"}`, nil
