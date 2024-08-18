@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -15,11 +16,15 @@ import (
 // App struct
 type App struct {
 	ctx context.Context
+
+	watching bool
+	watcher  *fsnotify.Watcher
+	stop     chan struct{}
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{}
+	return &App{stop: make(chan struct{})}
 }
 
 // startup is called when the app starts. The context is saved
@@ -46,8 +51,9 @@ func (a *App) Chdir() (string, error) {
 }
 
 type State struct {
-	CWD     string   `json:"cwd"`
-	PkgList []string `json:"pkg_list"`
+	CWD      string   `json:"cwd"`
+	PkgList  []string `json:"pkg_list"`
+	Watching bool     `json:"watching"`
 }
 
 func (a *App) List() (State, error) {
@@ -63,22 +69,26 @@ func (a *App) List() (State, error) {
 	if err != nil {
 		return State{}, err
 	}
-	return State{CWD: wd, PkgList: lines}, err
+	return State{CWD: wd, PkgList: lines, Watching: a.watching}, err
 }
 
 func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
-	watcher, err := fsnotify.NewWatcher()
+	if a.watching || a.watcher != nil {
+		return nil, errors.New("already watching")
+	}
+	var err error
+	a.watcher, err = fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
-
-	watcher.Add(".")
+	a.watcher.Add(".")
+	a.watching = true
 
 	// Start listening for events.
 	go func() {
 		for {
 			select {
-			case event, ok := <-watcher.Events:
+			case event, ok := <-a.watcher.Events:
 				if !ok {
 					return
 				}
@@ -91,18 +101,23 @@ func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
 					continue
 				}
 				runtime.LogDebugf(a.ctx, "ran tests: %s", s)
-			case err, ok := <-watcher.Errors:
+			case err, ok := <-a.watcher.Errors:
 				if !ok {
 					return
 				}
 				runtime.LogErrorf(a.ctx, "watch error: %s", err)
+			case <-a.stop:
+				runtime.LogDebugf(a.ctx, "stop watching")
+				a.watcher = nil
+				a.watching = false
+				return
 			}
 		}
 	}()
-	return watcher, nil
+	return a.watcher, nil
 }
 
-func (a *App) StartFSNotify(p TestParams) (string, error) {
+func (a *App) Watch(p TestParams) (string, error) {
 	_, err := a.fsnotify(p)
 	if err != nil {
 		return "", err
@@ -111,7 +126,11 @@ func (a *App) StartFSNotify(p TestParams) (string, error) {
 	return a.Run(p)
 }
 
-func (a *App) StopFSNotify() error {
+func (a *App) Unwatch() error {
+	if !a.watching {
+		return errors.New("not watching")
+	}
+	a.stop <- struct{}{}
 	return nil
 }
 
@@ -157,6 +176,7 @@ func (a *App) Run(p TestParams) (string, error) {
 			runtime.LogWarningf(a.ctx, "err scanning %s: %s", name, err)
 			runtime.EventsEmit(a.ctx, "err:scan."+name, err)
 		}
+		runtime.EventsEmit(a.ctx, "done."+name)
 	}
 	go f("stdout", stdout)
 	go f("stderr", stderr)

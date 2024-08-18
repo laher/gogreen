@@ -14,10 +14,10 @@ export function Run(arg1) {
   return window['go']['main']['App']['Run'](arg1);
 }
 
-export function StartFSNotify(arg1) {
-  return window['go']['main']['App']['StartFSNotify'](arg1);
+export function Unwatch() {
+  return window['go']['main']['App']['Unwatch']();
 }
 
-export function StopFSNotify() {
-  return window['go']['main']['App']['StopFSNotify']();
+export function Watch(arg1) {
+  return window['go']['main']['App']['Watch'](arg1);
 }

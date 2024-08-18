@@ -3,6 +3,7 @@ export namespace main {
 	export class State {
 	    cwd: string;
 	    pkg_list: string[];
+	    watching: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new State(source);
@@ -12,6 +13,7 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.cwd = source["cwd"];
 	        this.pkg_list = source["pkg_list"];
+	        this.watching = source["watching"];
 	    }
 	}
 	export class TestParams {

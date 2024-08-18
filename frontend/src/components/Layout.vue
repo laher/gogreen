@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { reactive } from 'vue'
-import { Run, List, Chdir, StopFSNotify, StartFSNotify } from '../../wailsjs/go/main/App'
+import { Run, List, Chdir, Watch, Unwatch } from '../../wailsjs/go/main/App'
 import { main } from '../../wailsjs/go/models'
 import Output from './Output.vue'
 
@@ -18,6 +18,7 @@ function list() {
     data.cwd = list.cwd
     data.list = list.pkg_list.map(value => {
       let label = value
+      // TODO make this nicer
       if (label.length > 15) {
         const parts = label.split('/')
         label = parts[parts.length - 1]
@@ -42,6 +43,15 @@ function chdir() {
   })
 }
 
+function watch(watch: boolean) {
+  console.log('watch', watch)
+  if (watch) {
+    start()
+  } else {
+    stop()
+  }
+}
+
 
 function start() {
   const params: main.TestParams = {
@@ -49,7 +59,7 @@ function start() {
     verbose: data.verbose,
     race: data.race,
   }
-  StartFSNotify(params).then(result => {
+  Watch(params).then(result => {
     console.log(result)
   }).catch(err => {
     console.log('run error', err)
@@ -57,7 +67,7 @@ function start() {
 }
 
 function stop() {
-  StopFSNotify().then(result => {
+  Unwatch().then(result => {
     console.log(result)
   }).catch(err => {
     console.log('run error', err)
@@ -89,13 +99,20 @@ function test() {
           </n-col>
           <n-col :span="12">
             <n-input-group>
-              <n-input-group-label>watch</n-input-group-label>
-              <n-switch v-model:value="data.fsnotify" />
+              <n-switch v-model:value="data.fsnotify" @update:value="watch">
+                <template #checked>
+                  Watching
+                </template>
+                <template #unchecked>
+                  Not watching
+                </template>
+              </n-switch>
               <!-- <n-button type="primary" @click="start">Start</n-button> -->
               <!-- <n-button type="error" @click="stop">Stop</n-button> -->
             </n-input-group>
           </n-col>
         </n-row>
+
       </n-layout-header>
 
 

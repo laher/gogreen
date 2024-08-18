@@ -8,6 +8,6 @@ export function List():Promise<main.State>;
 
 export function Run(arg1:main.TestParams):Promise<string>;
 
-export function StartFSNotify(arg1:main.TestParams):Promise<string>;
+export function Unwatch():Promise<void>;
 
-export function StopFSNotify():Promise<void>;
+export function Watch(arg1:main.TestParams):Promise<string>;
