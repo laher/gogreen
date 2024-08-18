@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import HelloWorld from './components/HelloWorld.vue'
+import Test from './components/Test.vue'
 import { NConfigProvider } from "naive-ui";
 import type { GlobalThemeOverrides } from "naive-ui";
 
@@ -34,7 +34,7 @@ const themeOverrides: GlobalThemeOverrides = {
       <n-message-provider>
         <n-notification-provider>
           <n-dialog-provider>
-            <HelloWorld />
+            <Test />
             <n-global-style />
           </n-dialog-provider>
         </n-notification-provider>

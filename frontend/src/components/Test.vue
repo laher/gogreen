@@ -15,6 +15,8 @@ class result {
 const r: result[] = [];
 const data = reactive({
   pkg: './samples/pass',
+  verbose: true,
+  race: true,
   result: r,
   list: [{ label: './...', value: './...' }],
 })
@@ -57,6 +59,8 @@ function chdir() {
 function test() {
   const params: main.TestParams = {
     pkg: data.pkg,
+    verbose: data.verbose,
+    race: data.race,
   }
   Run(params).then(result => {
     data.result = result.split('\n').map(x => {
@@ -81,6 +85,14 @@ function test() {
         <n-input-group-label>Package</n-input-group-label>
         <n-select v-model:value="data.pkg" :options="data.list" :style="{ width: '33%' }" />
         <n-button primary @click="test">Test</n-button>
+      </n-input-group>
+      <n-input-group>
+        <n-checkbox v-model:checked="data.verbose">
+          Verbose
+        </n-checkbox>
+        <n-checkbox v-model:checked="data.race">
+          Race
+        </n-checkbox>
       </n-input-group>
     </n-card>
     <n-card>

@@ -28,7 +28,9 @@ func (a *App) startup(ctx context.Context) {
 }
 
 type TestParams struct {
-	Pkg string `json:"pkg"`
+	Pkg     string `json:"pkg"`
+	Verbose bool   `json:"verbose"`
+	Race    bool   `json:"race"`
 }
 
 func (a *App) Chdir() (string, error) {
@@ -57,7 +59,15 @@ func (a *App) List() ([]string, error) {
 // Run returns a greeting for the given name
 func (a *App) Run(p TestParams) (string, error) {
 	// count=1 to avoid caching
-	cmd := exec.Command("go", "test", "-json", "-count=1", p.Pkg)
+	params := []string{"test", "-json", "-count=1"}
+	if p.Race {
+		params = append(params, "-race")
+	}
+	if p.Verbose {
+		params = append(params, "-v")
+	}
+	params = append(params, p.Pkg)
+	cmd := exec.Command("go", params...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		runtime.LogWarningf(a.ctx, "err creating stdoutpipe: %s", err)
