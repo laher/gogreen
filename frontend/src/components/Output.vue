@@ -28,6 +28,9 @@ EventsOn("stderr", (optionalData?: any) => {
   data.result.push(parsed)
 })
 
+EventsOn("cls", () => {
+  data.result = []
+})
 
 
 </script>

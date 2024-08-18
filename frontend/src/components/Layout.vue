@@ -5,7 +5,8 @@ import { main } from '../../wailsjs/go/models'
 import Output from './Output.vue'
 
 const data = reactive({
-  pkg: './samples/pass',
+  pkg: './...',
+  cwd: '',
   verbose: true,
   race: true,
   list: [{ label: './...', value: './...' }],
@@ -14,7 +15,8 @@ const data = reactive({
 
 function list() {
   List().then(list => {
-    data.list = list.map(value => {
+    data.cwd = list.cwd
+    data.list = list.pkg_list.map(value => {
       let label = value
       if (label.length > 15) {
         const parts = label.split('/')
@@ -106,6 +108,7 @@ function test() {
               <n-select v-model:value="data.pkg" :options="data.list" />
             </n-input-group>
             <n-input-group>
+              <n-input readonly v-model:value="data.cwd" />
               <n-button primary @click="chdir">Chdir</n-button>
             </n-input-group>
             <n-input-group>

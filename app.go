@@ -45,16 +45,25 @@ func (a *App) Chdir() (string, error) {
 	return dir, err
 }
 
-func (a *App) List() ([]string, error) {
+type State struct {
+	CWD     string   `json:"cwd"`
+	PkgList []string `json:"pkg_list"`
+}
+
+func (a *App) List() (State, error) {
 	cmd := exec.Command("go", "list", "./...")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return []string{}, err
+		return State{}, err
 	}
 	lines := []string{"./..."}
 	lines = append(lines, strings.Split(string(out), "\n")...)
 	lines = lines[:len(lines)-1]
-	return lines, err
+	wd, err := os.Getwd()
+	if err != nil {
+		return State{}, err
+	}
+	return State{CWD: wd, PkgList: lines}, err
 }
 
 func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
@@ -134,6 +143,7 @@ func (a *App) Run(p TestParams) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	runtime.EventsEmit(a.ctx, "cls")
 
 	f := func(name string, i io.ReadCloser) {
 		defer i.Close()

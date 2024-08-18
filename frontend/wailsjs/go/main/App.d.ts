@@ -4,7 +4,7 @@ import {main} from '../models';
 
 export function Chdir():Promise<string>;
 
-export function List():Promise<Array<string>>;
+export function List():Promise<main.State>;
 
 export function Run(arg1:main.TestParams):Promise<string>;
 
