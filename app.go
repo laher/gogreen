@@ -3,40 +3,68 @@ package main
 import (
 	"bufio"
 	"context"
+	"embed"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/gen2brain/beeep"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
 type App struct {
-	ctx context.Context
+	// state to communicate to the frontend
+	state State
 
-	watching bool
-	watcher  *fsnotify.Watcher
-	stop     chan struct{}
+	// internal state
+	ctx     context.Context // wails requires a context.Context
+	watcher *fsnotify.Watcher
+	stop    chan struct{}
+}
+
+// state to communicate to the frontend
+type State struct {
+	CWD        string     `json:"cwd"`
+	PkgList    []string   `json:"pkg_list"`
+	Watching   bool       `json:"watching"`
+	Running    bool       `json:"running"`
+	TestParams TestParams `json:"test_params"`
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{stop: make(chan struct{})}
+	return &App{
+		stop: make(chan struct{}),
+		state: State{
+			CWD:        ".",
+			TestParams: TestParams{Pkg: ".", Verbose: true},
+		},
+	}
 }
 
 // startup is called when the app starts. The context is saved
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	if a.state.CWD == "" {
+		a.state.CWD = "." // simplest thing to do
+	}
+	err := os.Chdir(a.state.CWD)
+	if err != nil {
+		panic("cant change directory to " + a.state.CWD + ": " + err.Error())
+	}
 }
 
 type TestParams struct {
 	Pkg     string `json:"pkg"`
 	Verbose bool   `json:"verbose"`
 	Race    bool   `json:"race"`
+	Run     string `json:"run"`
 }
 
 func (a *App) Chdir() (string, error) {
@@ -50,30 +78,26 @@ func (a *App) Chdir() (string, error) {
 	return dir, err
 }
 
-type State struct {
-	CWD      string   `json:"cwd"`
-	PkgList  []string `json:"pkg_list"`
-	Watching bool     `json:"watching"`
-}
-
 func (a *App) List() (State, error) {
 	cmd := exec.Command("go", "list", "./...")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return State{}, err
 	}
-	lines := []string{"./..."}
+	lines := []string{".", "./..."}
 	lines = append(lines, strings.Split(string(out), "\n")...)
 	lines = lines[:len(lines)-1]
-	wd, err := os.Getwd()
-	if err != nil {
-		return State{}, err
-	}
-	return State{CWD: wd, PkgList: lines, Watching: a.watching}, err
+
+	a.state.PkgList = lines
+
+	return a.state, nil
 }
 
+//go:embed frontend/src/assets/images
+var images embed.FS
+
 func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
-	if a.watching || a.watcher != nil {
+	if a.state.Watching || a.watcher != nil {
 		return nil, errors.New("already watching")
 	}
 	var err error
@@ -82,7 +106,7 @@ func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
 		return nil, err
 	}
 	a.watcher.Add(".")
-	a.watching = true
+	a.state.Watching = true
 
 	// Start listening for events.
 	go func() {
@@ -92,11 +116,14 @@ func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
 				if !ok {
 					return
 				}
+				if a.state.Running {
+					// debounce? ... in sime cases maybe set a flag saying we should start again right away?
+					runtime.LogDebugf(a.ctx, "ignore watch event (already running tests): %+v", event)
+					continue
+				}
 				runtime.LogDebugf(a.ctx, "watch event: %+v", event)
-				// TODO - debounce?
 				s, err := a.Run(p)
 				if err != nil {
-
 					runtime.LogErrorf(a.ctx, "error running tests: %s", err)
 					continue
 				}
@@ -109,7 +136,7 @@ func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
 			case <-a.stop:
 				runtime.LogDebugf(a.ctx, "stop watching")
 				a.watcher = nil
-				a.watching = false
+				a.state.Watching = false
 				return
 			}
 		}
@@ -127,7 +154,7 @@ func (a *App) Watch(p TestParams) (string, error) {
 }
 
 func (a *App) Unwatch() error {
-	if !a.watching {
+	if !a.state.Watching {
 		return errors.New("not watching")
 	}
 	a.stop <- struct{}{}
@@ -136,6 +163,7 @@ func (a *App) Unwatch() error {
 
 // Run returns a greeting for the given name
 func (a *App) Run(p TestParams) (string, error) {
+	a.state.Running = true
 	// count=1 to avoid caching
 	params := []string{"test", "-json", "-count=1"}
 	if p.Race {
@@ -143,6 +171,9 @@ func (a *App) Run(p TestParams) (string, error) {
 	}
 	if p.Verbose {
 		params = append(params, "-v")
+	}
+	if p.Run != "" {
+		params = append(params, "-run", p.Run)
 	}
 	params = append(params, p.Pkg)
 	cmd := exec.Command("go", params...)
@@ -160,6 +191,7 @@ func (a *App) Run(p TestParams) (string, error) {
 	// stdoutStderr, err := cmd.CombinedOutput()
 	// err = nil // ignore for now
 	if err != nil {
+		a.state.Running = false
 		return "", err
 	}
 	runtime.EventsEmit(a.ctx, "cls")
@@ -181,12 +213,41 @@ func (a *App) Run(p TestParams) (string, error) {
 	go f("stdout", stdout)
 	go f("stderr", stderr)
 	go func() {
+		defer func() { a.state.Running = false }()
 		err := cmd.Wait()
+		result := "PASS"
 		if err != nil {
-			// TODO publish some error
-			runtime.EventsEmit(a.ctx, "err:cmdwait", err)
+			result = "FAIL"
 		}
-		runtime.EventsEmit(a.ctx, "done")
+		runtime.EventsEmit(a.ctx, "result."+result, err)
+		runtime.LogDebugf(a.ctx, "'go test' exited: %v", err)
+
+		fw, err := os.Create("/tmp/logo.png")
+		if err != nil {
+			runtime.LogWarningf(a.ctx, "err creating image file: %s", err)
+		} else {
+			fr, err := images.Open("frontend/src/assets/images/logo-universal.png")
+			if err != nil {
+				runtime.LogWarningf(a.ctx, "err loading image data: %s", err)
+			} else {
+				_, err = io.Copy(fw, fr)
+				if err != nil {
+					runtime.LogWarningf(a.ctx, "err writing image data: %s", err)
+				}
+				fw.Close()
+				fr.Close()
+			}
+		}
+
+		err = beeep.Notify(
+			fmt.Sprintf("test result - %s", result),
+			"test finished. test "+result+"ED",
+			"/tmp/logo.png")
+		if err != nil {
+			runtime.LogWarningf(a.ctx, "err sending notification: %s", err)
+		}
+		stdout.Close()
+		stderr.Close()
 	}()
 	//	runtime.LogDebugf(a.ctx, "got %d bytes of data", len(stdoutStderr))
 	//	runtime.LogDebugf(a.ctx, "%s", string(stdoutStderr))

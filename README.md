@@ -1,11 +1,12 @@
-# gotesty
+# gogetgreen
 
 ## About
 
-This is the official Wails Vue-TS template.
+> gogetgreen is an awkward pun. It's not about saving the environment, sorry. I nearly called it gogreen but that seemed too much.
 
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: <https://wails.io/docs/reference/project-config>
+gogetgreen is a test runner for Go (aka golang), the programming language. It's a desktop app which can watch your project for file changes.
+
+It's early days. It's not very good yet.
 
 ## Live Development
 

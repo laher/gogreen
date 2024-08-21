@@ -57,11 +57,11 @@ EventsOn("cls", () => {
   <n-card>
     <n-table>
       <n-tr v-for="r in data.result" :class="r.Action">
-        <n-td class="date">{{ r.Time ? new Date(Date.parse(r.Time)).toLocaleTimeString('en-AU', {
+        <n-th class="date">{{ r.Time ? new Date(Date.parse(r.Time)).toLocaleTimeString('en-AU', {
           hour: 'numeric', minute: 'numeric',
           second: 'numeric', fractionalSecondDigits: 3
         }) : ''
-          }}</n-td>
+          }}</n-th>
         <n-td v-if="!r.Output" class="msg">{{ r.Action + ' ' + r.Package }}</n-td>
         <n-td v-else class="msg">{{ r.Output }}</n-td>
       </n-tr>
@@ -70,6 +70,10 @@ EventsOn("cls", () => {
 </template>
 
 <style scoped>
+th {
+  max-width: '10%';
+}
+
 .run td {
   background-color: cyan;
 }

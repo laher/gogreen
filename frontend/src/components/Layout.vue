@@ -5,12 +5,13 @@ import { main } from '../../wailsjs/go/models'
 import Output from './Output.vue'
 
 const data = reactive({
-  pkg: './...',
+  pkg: '.',
   cwd: '',
   verbose: true,
   race: true,
-  list: [{ label: './...', value: './...' }],
+  list: [{ label: '.', value: '.' }, { label: './...', value: './...' }],
   fsnotify: false,
+  run: '',
 })
 
 function list() {
@@ -25,7 +26,7 @@ function list() {
       }
       return { value, label }
     })
-    data.pkg = './...'
+    data.pkg = '.'
   }).catch(err => {
     console.log('list dirs error', err)
   })
@@ -58,6 +59,7 @@ function start() {
     pkg: data.pkg,
     verbose: data.verbose,
     race: data.race,
+    run: data.run,
   }
   Watch(params).then(result => {
     console.log(result)
@@ -78,6 +80,7 @@ function test() {
     pkg: data.pkg,
     verbose: data.verbose,
     race: data.race,
+    run: data.run,
   }
   Run(params).then(result => {
     console.log(result)
@@ -93,8 +96,8 @@ function test() {
         <n-row gutter="12">
           <n-col :span="12">
             <n-input-group>
-              <n-input-group-label><b>gotesty</b> </n-input-group-label>
-              <n-button type="primary" @click="test">Run</n-button>
+              <n-input-group-label><b>gogetgreen</b> </n-input-group-label>
+              <n-button type="primary" @click="test">Test</n-button>
             </n-input-group>
           </n-col>
           <n-col :span="12">
@@ -118,26 +121,36 @@ function test() {
 
       <n-layout position="absolute" style="top: 64px; bottom: 64px" has-sider>
         <n-layout-sider content-style="padding: 24px;" :native-scrollbar="false" collapse-mode="transform"
-          :collapsed-width="120" :width="340" show-trigger="arrow-circle" bordered>
+          :collapsed-width="20" :width="340" show-trigger="arrow-circle" bordered>
           <n-h2>Options</n-h2>
           <n-card>
+            <n-h3>gotest options</n-h3>
             <n-input-group>
+              <n-input-group-label>Pkg</n-input-group-label>
               <n-select v-model:value="data.pkg" :options="data.list" />
             </n-input-group>
             <n-input-group>
+              <n-input-group-label>Root</n-input-group-label>
               <n-input readonly v-model:value="data.cwd" />
               <n-button primary @click="chdir">Chdir</n-button>
+            </n-input-group>
+            <n-input-group>
+              <n-input-group-label>Which tests</n-input-group-label>
+              <n-input v-model:value="data.run" />
             </n-input-group>
             <n-input-group>
               <n-checkbox v-model:checked="data.verbose">
                 Verbose
               </n-checkbox>
-            </n-input-group>
-            <n-input-group>
               <n-checkbox v-model:checked="data.race">
                 Race
               </n-checkbox>
             </n-input-group>
+          </n-card>
+
+          <n-card>
+            <n-h3>File watcher options</n-h3>
+
           </n-card>
         </n-layout-sider>
         <n-layout content-style="padding: 24px; min-height:600px" :native-scrollbar="false">
@@ -145,7 +158,7 @@ function test() {
         </n-layout>
       </n-layout>
       <n-layout-footer position="absolute" style="height: 64px; padding: 24px" bordered>
-        <i>Run your tests like the moon pulls the tides - always</i>
+        <i>It isn't easy staying green.</i>
       </n-layout-footer>
     </n-layout>
   </main>
