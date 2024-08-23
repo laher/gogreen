@@ -1,10 +1,12 @@
-# gogetgreen
+# gogreen
+
+A test runner for Go. Continuous testing with a UI
 
 ## About
 
-> gogetgreen is an awkward pun. It's not about saving the environment, sorry. I nearly called it gogreen but that seemed too much.
+> gogreen is a awkward pun about Go and the colour often used to indicate 'test succeeded'. It's not about saving the environment, sorry.
 
-gogetgreen is a test runner for Go (aka golang), the programming language. It's a desktop app which can watch your project for file changes.
+`gogreen` is a test runner for Go (aka golang), the programming language. It's a desktop app which can watch your project for file changes.
 
 It's early days. It's not very good yet.
 

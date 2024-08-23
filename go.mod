@@ -1,4 +1,4 @@
-module gogetgreen
+module gogreen
 
 go 1.21
 

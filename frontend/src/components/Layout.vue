@@ -1,23 +1,52 @@
 <script lang="ts" setup>
 import { reactive } from 'vue'
-import { Run, List, Chdir, Watch, Unwatch } from '../../wailsjs/go/main/App'
+import { Run, GetState, Chdir, Watch, Unwatch } from '../../wailsjs/go/main/App'
 import { main } from '../../wailsjs/go/models'
 import Output from './Output.vue'
+import { EventsOn } from "../../wailsjs/runtime";
 
-const data = reactive({
-  pkg: '.',
-  cwd: '',
-  verbose: true,
-  race: true,
+interface Listitem {
+  label: string,
+  value: string,
+}
+
+interface Data {
+  list: Listitem[],
+  fsnotify: boolean,
+  result: string,
+  cwd: string,
+  disabled: boolean,
+  state: main.State | null,
+  testParams: main.TestParams,
+}
+
+const data: Data = reactive({
   list: [{ label: '.', value: '.' }, { label: './...', value: './...' }],
   fsnotify: false,
-  run: '',
+  result: '',
+  state: null,
+  cwd: '.',
+  disabled: false,
+  testParams: {
+    pkg: './...',
+    run: '',
+    verbose: true,
+    race: true,
+  }
 })
 
-function list() {
-  List().then(list => {
-    data.cwd = list.cwd
-    data.list = list.pkg_list.map(value => {
+EventsOn("result", (optionalData?: any) => {
+  console.log(`result received - ${optionalData}`)
+  data.result = optionalData
+  data.disabled = false
+})
+
+function getState() {
+  GetState().then(state => {
+    data.state = state
+    data.cwd = state.cwd
+    data.disabled = state.running || state.watching
+    data.list = state.pkg_list.map(value => {
       let label = value
       // TODO make this nicer
       if (label.length > 15) {
@@ -26,19 +55,18 @@ function list() {
       }
       return { value, label }
     })
-    data.pkg = '.'
   }).catch(err => {
     console.log('list dirs error', err)
   })
 }
 
-list()
+getState()
 
 function chdir() {
   Chdir().then(result => {
     console.log(`changed dir to ${result}`)
     // re-fetch the list of packages
-    list()
+    getState()
   }).catch(err => {
     console.log('chdir error', err)
   })
@@ -55,13 +83,14 @@ function watch(watch: boolean) {
 
 
 function start() {
-  const params: main.TestParams = {
-    pkg: data.pkg,
-    verbose: data.verbose,
-    race: data.race,
-    run: data.run,
+  data.result = ''
+  if (data.state === null) {
+    console.log('no state')
+    return
   }
-  Watch(params).then(result => {
+
+  Watch(data.testParams).then(result => {
+    data.disabled = true
     console.log(result)
   }).catch(err => {
     console.log('run error', err)
@@ -71,33 +100,48 @@ function start() {
 function stop() {
   Unwatch().then(result => {
     console.log(result)
+    data.disabled = false
   }).catch(err => {
-    console.log('run error', err)
+    console.log('stop error', err)
   })
 }
+
 function test() {
-  const params: main.TestParams = {
-    pkg: data.pkg,
-    verbose: data.verbose,
-    race: data.race,
-    run: data.run,
+  data.result = ''
+  if (data.state === null) {
+    console.log('no state')
+    return
   }
-  Run(params).then(result => {
+  Run(data.testParams).then(result => {
     console.log(result)
+    data.disabled = true
   }).catch(err => {
     console.log('run error', err)
   })
 }
 </script>
+<style scoped>
+.header_ {
+  background-color: #FFD230;
+}
+
+.header_PASS {
+  background-color: lightgreen;
+}
+
+.header_FAIL {
+  background-color: pink;
+}
+</style>
 <template>
   <main>
     <n-layout style="height: 768px">
-      <n-layout-header style="height: 64px; padding: 24px; background-color: #FFD230" bordered>
+      <n-layout-header style="height: 64px; padding: 24px;" bordered :class="`header_${data.result}`">
         <n-row gutter="12">
           <n-col :span="12">
             <n-input-group>
-              <n-input-group-label><b>gogetgreen</b> </n-input-group-label>
-              <n-button type="primary" @click="test">Test</n-button>
+              <n-input-group-label><b>gogreen</b> </n-input-group-label>
+              <n-button type="primary" @click="test" :disabled="data.disabled">Test</n-button>
             </n-input-group>
           </n-col>
           <n-col :span="12">
@@ -122,34 +166,35 @@ function test() {
       <n-layout position="absolute" style="top: 64px; bottom: 64px" has-sider>
         <n-layout-sider content-style="padding: 24px;" :native-scrollbar="false" collapse-mode="transform"
           :collapsed-width="20" :width="340" show-trigger="arrow-circle" bordered>
-          <n-h2>Options</n-h2>
           <n-card>
-            <n-h3>gotest options</n-h3>
+            <n-h3><code>go test</code> options</n-h3>
             <n-input-group>
               <n-input-group-label>Pkg</n-input-group-label>
-              <n-select v-model:value="data.pkg" :options="data.list" />
+              <n-select v-model:value="data.testParams.pkg" :options="data.list" :disabled="data.disabled" />
             </n-input-group>
             <n-input-group>
               <n-input-group-label>Root</n-input-group-label>
-              <n-input readonly v-model:value="data.cwd" />
-              <n-button primary @click="chdir">Chdir</n-button>
+              <n-input readonly v-model:value="data.cwd" :disabled="data.disabled" />
+              <n-button primary @click="chdir" :disabled="data.disabled">Chdir</n-button>
             </n-input-group>
             <n-input-group>
               <n-input-group-label>Which tests</n-input-group-label>
-              <n-input v-model:value="data.run" />
+              <n-input v-model:value="data.testParams.run" :disabled="data.disabled" />
             </n-input-group>
             <n-input-group>
-              <n-checkbox v-model:checked="data.verbose">
+              <n-checkbox v-model:checked="data.testParams.verbose" :disabled="data.disabled">
                 Verbose
               </n-checkbox>
-              <n-checkbox v-model:checked="data.race">
+              <n-checkbox v-model:checked="data.testParams.race" :disabled="data.disabled">
                 Race
               </n-checkbox>
             </n-input-group>
           </n-card>
 
           <n-card>
+            <!--
             <n-h3>File watcher options</n-h3>
+            -->
 
           </n-card>
         </n-layout-sider>

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gen2brain/beeep"
@@ -25,6 +26,7 @@ type App struct {
 	ctx     context.Context // wails requires a context.Context
 	watcher *fsnotify.Watcher
 	stop    chan struct{}
+	sync.RWMutex
 }
 
 // state to communicate to the frontend
@@ -78,7 +80,9 @@ func (a *App) Chdir() (string, error) {
 	return dir, err
 }
 
-func (a *App) List() (State, error) {
+func (a *App) GetState() (State, error) {
+	a.Lock()
+	defer a.Unlock()
 	cmd := exec.Command("go", "list", "./...")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -97,7 +101,10 @@ func (a *App) List() (State, error) {
 var images embed.FS
 
 func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
-	if a.state.Watching || a.watcher != nil {
+	a.RLock()
+	alreadyWatching := a.state.Watching || a.watcher != nil
+	a.RUnlock()
+	if alreadyWatching {
 		return nil, errors.New("already watching")
 	}
 	var err error
@@ -105,6 +112,8 @@ func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
 	if err != nil {
 		return nil, err
 	}
+	a.Lock()
+	defer a.Unlock()
 	a.watcher.Add(".")
 	a.state.Watching = true
 
@@ -116,11 +125,14 @@ func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
 				if !ok {
 					return
 				}
+				a.RLock()
 				if a.state.Running {
+					a.RUnlock()
 					// debounce? ... in sime cases maybe set a flag saying we should start again right away?
 					runtime.LogDebugf(a.ctx, "ignore watch event (already running tests): %+v", event)
 					continue
 				}
+				a.RUnlock()
 				runtime.LogDebugf(a.ctx, "watch event: %+v", event)
 				s, err := a.Run(p)
 				if err != nil {
@@ -134,9 +146,13 @@ func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
 				}
 				runtime.LogErrorf(a.ctx, "watch error: %s", err)
 			case <-a.stop:
-				runtime.LogDebugf(a.ctx, "stop watching")
-				a.watcher = nil
-				a.state.Watching = false
+				func() {
+					a.Lock()
+					defer a.Unlock()
+					runtime.LogDebugf(a.ctx, "stop watching")
+					a.watcher = nil
+					a.state.Watching = false
+				}()
 				return
 			}
 		}
@@ -154,16 +170,25 @@ func (a *App) Watch(p TestParams) (string, error) {
 }
 
 func (a *App) Unwatch() error {
-	if !a.state.Watching {
+	a.RLock()
+	watching := a.state.Watching
+	a.RUnlock()
+	if !watching {
 		return errors.New("not watching")
 	}
 	a.stop <- struct{}{}
 	return nil
 }
 
+func (a *App) setRunning(running bool) {
+	a.Lock()
+	defer a.Unlock()
+	a.state.Running = running
+}
+
 // Run returns a greeting for the given name
 func (a *App) Run(p TestParams) (string, error) {
-	a.state.Running = true
+	a.setRunning(true)
 	// count=1 to avoid caching
 	params := []string{"test", "-json", "-count=1"}
 	if p.Race {
@@ -191,7 +216,7 @@ func (a *App) Run(p TestParams) (string, error) {
 	// stdoutStderr, err := cmd.CombinedOutput()
 	// err = nil // ignore for now
 	if err != nil {
-		a.state.Running = false
+		a.setRunning(false)
 		return "", err
 	}
 	runtime.EventsEmit(a.ctx, "cls")
@@ -213,12 +238,13 @@ func (a *App) Run(p TestParams) (string, error) {
 	go f("stdout", stdout)
 	go f("stderr", stderr)
 	go func() {
-		defer func() { a.state.Running = false }()
+		defer a.setRunning(false)
 		err := cmd.Wait()
 		result := "PASS"
 		if err != nil {
 			result = "FAIL"
 		}
+		runtime.EventsEmit(a.ctx, "result", result)
 		runtime.EventsEmit(a.ctx, "result."+result, err)
 		runtime.LogDebugf(a.ctx, "'go test' exited: %v", err)
 
