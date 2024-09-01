@@ -38,7 +38,9 @@ const data: Data = reactive({
 EventsOn("result", (optionalData?: any) => {
   console.log(`result received - ${optionalData}`)
   data.result = optionalData
-  data.disabled = false
+  if (!data.fsnotify) {
+    data.disabled = false
+  }
 })
 
 function getState() {
@@ -138,24 +140,27 @@ function test() {
     <n-layout style="height: 768px">
       <n-layout-header style="height: 64px; padding: 24px;" bordered :class="`header_${data.result}`">
         <n-row gutter="12">
-          <n-col :span="12">
-            <n-input-group>
-              <n-input-group-label><b>gogreen</b> </n-input-group-label>
-              <n-button type="primary" @click="test" :disabled="data.disabled">Test</n-button>
-            </n-input-group>
+          <n-col :span="3">
+            <div class="header">
+              <b>go</b> green
+            </div>
           </n-col>
-          <n-col :span="12">
+          <n-col :span="15" />
+          <n-col :span="6">
             <n-input-group>
-              <n-switch v-model:value="data.fsnotify" @update:value="watch">
-                <template #checked>
-                  Watching
-                </template>
-                <template #unchecked>
-                  Not watching
-                </template>
-              </n-switch>
-              <!-- <n-button type="primary" @click="start">Start</n-button> -->
-              <!-- <n-button type="error" @click="stop">Stop</n-button> -->
+              <n-button type="primary" @click="test" :disabled="data.disabled">Run</n-button>
+              <div class="n-input-group-label" data-v-fcbebc900
+                style="--n-bezier: cubic-bezier(0.4, 0, 0.2, 1); --n-group-label-color: rgb(250, 250, 252); --n-group-label-border: 1px solid rgb(224, 224, 230); --n-border-radius: 3px; --n-group-label-text-color: rgb(51, 54, 57); --n-font-size: 14px; --n-line-height: 1.6; --n-height: 34px;">
+                Watch
+                <n-switch v-model:value="data.fsnotify" @update:value="watch" :round="false">
+                  <template #checked>
+                    Stop
+                  </template>
+                  <template #unchecked>
+                    Start
+                  </template>
+                </n-switch>
+              </div>
             </n-input-group>
           </n-col>
         </n-row>
@@ -169,17 +174,13 @@ function test() {
           <n-card>
             <n-h3><code>go test</code> options</n-h3>
             <n-input-group>
-              <n-input-group-label>Pkg</n-input-group-label>
-              <n-select v-model:value="data.testParams.pkg" :options="data.list" :disabled="data.disabled" />
-            </n-input-group>
-            <n-input-group>
               <n-input-group-label>Root</n-input-group-label>
               <n-input readonly v-model:value="data.cwd" :disabled="data.disabled" />
               <n-button primary @click="chdir" :disabled="data.disabled">Chdir</n-button>
             </n-input-group>
             <n-input-group>
-              <n-input-group-label>Which tests</n-input-group-label>
-              <n-input v-model:value="data.testParams.run" :disabled="data.disabled" />
+              <n-input-group-label>Pkg</n-input-group-label>
+              <n-select v-model:value="data.testParams.pkg" :options="data.list" :disabled="data.disabled" />
             </n-input-group>
             <n-input-group>
               <n-checkbox v-model:checked="data.testParams.verbose" :disabled="data.disabled">
@@ -188,6 +189,10 @@ function test() {
               <n-checkbox v-model:checked="data.testParams.race" :disabled="data.disabled">
                 Race
               </n-checkbox>
+            </n-input-group>
+            <n-input-group>
+              <n-input-group-label>Which tests</n-input-group-label>
+              <n-input v-model:value="data.testParams.run" :disabled="data.disabled" />
             </n-input-group>
           </n-card>
 
@@ -198,7 +203,7 @@ function test() {
 
           </n-card>
         </n-layout-sider>
-        <n-layout content-style="padding: 24px; min-height:600px" :native-scrollbar="false">
+        <n-layout content-style="padding: 24px; min-height:600px" :native-scrollbar="true">
           <Output />
         </n-layout>
       </n-layout>
@@ -208,3 +213,14 @@ function test() {
     </n-layout>
   </main>
 </template>
+<style lang="css" scoped>
+.header {
+  text-align: center;
+  font-size: 18px;
+  color: #fff;
+  background-color: green;
+  border: 1px solid green;
+  padding: 1px;
+  border-radius: 10px;
+}
+</style>

@@ -20,41 +20,52 @@ EventsOn("stdout", (optionalData?: any) => {
   console.log(`data received on stdout - ${optionalData}`)
   const parsed = JSON.parse(optionalData)
   data.result.push(parsed)
+  scroll()
 })
 
 EventsOn("stderr", (optionalData?: any) => {
   console.log(`data received on stderr - ${optionalData}`)
   const parsed = JSON.parse(optionalData)
   data.result.push(parsed)
+  scroll()
 })
+
+const scroll = () => {
+  const below = document.getElementById('below-timeline');
+  if (!below) return
+  setTimeout(() => {
+    below.scrollIntoView({ behavior: 'smooth' });
+  }, 100);
+
+}
 
 EventsOn("cls", () => {
   data.result = []
 })
 
+const fmtTime = (t: string) => {
+  if (t === '') return ''
+  return new Date(Date.parse(t)).toLocaleTimeString('en-AU', {
+    hour: 'numeric', minute: 'numeric',
+    second: 'numeric', fractionalSecondDigits: 3
+  })
+}
+
 
 </script>
 
 <template>
-  <!--
-  <n-card>
-    <n-input-group>
-      <n-button primary @click="chdir">Chdir</n-button>
-      <n-input-group-label>Package</n-input-group-label>
-      <n-select v-model:value="data.pkg" :options="data.list" :style="{ width: '33%' }" />
-      <n-button primary @click="test">Test</n-button>
-    </n-input-group>
-    <n-input-group>
-      <n-checkbox v-model:checked="data.verbose">
-        Verbose
-      </n-checkbox>
-      <n-checkbox v-model:checked="data.race">
-        Race
-      </n-checkbox>
-    </n-input-group>
-  </n-card>
-    -->
-  <n-card>
+  <n-card id="output-card" title="Output">
+    <n-timeline item-placement="left" size="large">
+      <n-timeline-item v-for="r in data.result"
+        :type="r.Action === 'fail' ? 'error' : r.Action === 'pass' ? 'success' : r.Action === 'start' ? 'info' : ''"
+        :time="fmtTime(r.Time)" :title="r.Action === 'output' ? '' : r.Action"
+        :content="r.Output ? r.Output : 'pkg ' + r.Package" />
+
+
+    </n-timeline>
+
+    <!--
     <n-table>
       <n-tr v-for="r in data.result" :class="r.Action">
         <n-th class="date">{{ r.Time ? new Date(Date.parse(r.Time)).toLocaleTimeString('en-AU', {
@@ -66,7 +77,9 @@ EventsOn("cls", () => {
         <n-td v-else class="msg">{{ r.Output }}</n-td>
       </n-tr>
     </n-table>
+    -->
   </n-card>
+  <n-card id="below-timeline" />
 </template>
 
 <style scoped>
