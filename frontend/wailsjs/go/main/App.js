@@ -10,6 +10,10 @@ export function GetState() {
   return window['go']['main']['App']['GetState']();
 }
 
+export function GetTestFuncs(arg1) {
+  return window['go']['main']['App']['GetTestFuncs'](arg1);
+}
+
 export function Lock() {
   return window['go']['main']['App']['Lock']();
 }

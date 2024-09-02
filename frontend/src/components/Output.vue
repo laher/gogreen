@@ -2,6 +2,7 @@
 import { reactive } from 'vue'
 import { EventsOn } from "../../wailsjs/runtime";
 
+import { useMessage } from 'naive-ui'
 
 class result {
   Time: string;
@@ -14,13 +15,23 @@ const r: result[] = [];
 const data = reactive({
   result: r,
 })
-
+const message = useMessage()
 
 EventsOn("stdout", (optionalData?: any) => {
   console.log(`data received on stdout - ${optionalData}`)
   const parsed = JSON.parse(optionalData)
   data.result.push(parsed)
   scroll()
+})
+EventsOn("result", (optionalData?: any) => {
+  if (optionalData === 'PASS') {
+    message.success('Test result - PASS')
+    return
+  }
+  if (optionalData === 'FAIL') {
+    message.error('Test result - FAIL')
+    return
+  }
 })
 
 EventsOn("stderr", (optionalData?: any) => {

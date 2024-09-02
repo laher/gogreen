@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -95,6 +96,52 @@ func (a *App) GetState() (State, error) {
 	a.state.PkgList = lines
 
 	return a.state, nil
+}
+
+// Result represents a line of JSON output from `go test -json`
+type Result struct {
+	Action  string `json:"Action"`
+	Package string `json:"Package"`
+	Output  string `json:"Output"`
+	Time    string `json:"Time"`
+}
+
+type Package struct {
+	Pkg       string   `json:"pkg"`
+	TestFuncs []string `json:"testFuncs"`
+}
+
+// TODO cwd
+func (a *App) GetTestFuncs(p TestParams) ([]Package, error) {
+	a.Lock()
+	defer a.Unlock()
+	// any test func
+	// (ignore example tests, benchmarks ...)
+	cmd := exec.Command("go", "test", "-list=Test", "-json", p.Pkg)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+	lines := []string{}
+	lines = append(lines, strings.Split(string(out), "\n")...)
+	lines = lines[:len(lines)-1]
+	result := map[string]Package{}
+	for _, line := range lines {
+		r := Result{}
+		err := json.Unmarshal([]byte(line), &r)
+		if err != nil {
+			return nil, err
+		}
+		if r.Action == "output" && strings.HasPrefix(r.Output, "Test") {
+			tf := result[r.Package].TestFuncs
+			result[r.Package] = Package{Pkg: r.Package, TestFuncs: append(tf, r.Output)}
+		}
+	}
+	ret := []Package{}
+	for _, r := range result {
+		ret = append(ret, r)
+	}
+	return ret, nil
 }
 
 //go:embed frontend/src/assets/images
@@ -239,8 +286,8 @@ func (a *App) Run(p TestParams) (string, error) {
 	go f("stderr", stderr)
 	go func() {
 		defer a.setRunning(false)
-		err := cmd.Wait()
 		result := "PASS"
+		err := cmd.Wait()
 		if err != nil {
 			result = "FAIL"
 		}

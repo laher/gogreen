@@ -7,6 +7,8 @@ export function Chdir():Promise<string>;
 
 export function GetState():Promise<main.State>;
 
+export function GetTestFuncs(arg1:main.TestParams):Promise<Array<main.Package>>;
+
 export function Lock():Promise<void>;
 
 export function RLock():Promise<void>;

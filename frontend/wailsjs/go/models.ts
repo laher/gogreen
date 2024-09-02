@@ -1,5 +1,19 @@
 export namespace main {
 	
+	export class Package {
+	    pkg: string;
+	    testFuncs: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Package(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.pkg = source["pkg"];
+	        this.testFuncs = source["testFuncs"];
+	    }
+	}
 	export class TestParams {
 	    pkg: string;
 	    verbose: boolean;
