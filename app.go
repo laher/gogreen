@@ -130,8 +130,7 @@ func (a *App) GetTestFuncs(p TestParams) ([]Package, error) {
 	result := map[string]Package{}
 	for _, line := range lines {
 		r := Result{}
-		err := json.Unmarshal([]byte(line), &r)
-		if err != nil {
+		if err := json.Unmarshal([]byte(line), &r); err != nil {
 			return nil, err
 		}
 		if r.Action == "output" && strings.HasPrefix(r.Output, "Test") {
@@ -149,11 +148,11 @@ func (a *App) GetTestFuncs(p TestParams) ([]Package, error) {
 //go:embed frontend/src/assets/images
 var images embed.FS
 
-func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
+func (a *App) watch(p TestParams) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	if a.state.Watching {
-		return nil, errors.New("already watching")
+		return errors.New("already watching")
 	}
 	if a.watcher != nil {
 		panic("watcher should be nil when starting to watch")
@@ -161,7 +160,7 @@ func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
 	var err error
 	a.watcher, err = fsnotify.NewWatcher()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	a.watcher.Add(".")
 	a.state.Watching = true
@@ -205,12 +204,11 @@ func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
 			}
 		}
 	}()
-	return a.watcher, nil
+	return nil
 }
 
 func (a *App) Watch(p TestParams) (string, error) {
-	_, err := a.fsnotify(p)
-	if err != nil {
+	if err := a.watch(p); err != nil {
 		return "", err
 	}
 	// run once to start things off
@@ -301,36 +299,34 @@ func (a *App) Run(p TestParams) (string, error) {
 			a.state.Running = false
 		}()
 		result := "PASS"
-		err := cmd.Wait()
-		if err != nil {
+		if err := cmd.Wait(); err != nil {
 			result = "FAIL"
 		}
 		runtime.EventsEmit(a.ctx, "result", result)
 		runtime.EventsEmit(a.ctx, "result."+result, err)
 		runtime.LogDebugf(a.ctx, "'go test' exited: %v", err)
 
-		fw, err := os.Create("/tmp/logo.png")
-		if err != nil {
-			runtime.LogWarningf(a.ctx, "err creating image file: %s", err)
-		} else {
-			fr, err := images.Open("frontend/src/assets/images/logo-universal.png")
-			if err != nil {
-				runtime.LogWarningf(a.ctx, "err loading image data: %s", err)
-			} else {
-				_, err = io.Copy(fw, fr)
-				if err != nil {
-					runtime.LogWarningf(a.ctx, "err writing image data: %s", err)
-				}
-				fw.Close()
-				fr.Close()
-			}
-		}
+		// fw, err := os.Create("/tmp/logo.png")
+		// if err != nil {
+		// 	runtime.LogWarningf(a.ctx, "err creating image file: %s", err)
+		// } else {
+		// 	fr, err := images.Open("frontend/src/assets/images/logo-universal.png")
+		// 	if err != nil {
+		// 		runtime.LogWarningf(a.ctx, "err loading image data: %s", err)
+		// 	} else {
+		// 		_, err = io.Copy(fw, fr)
+		// 		if err != nil {
+		// 			runtime.LogWarningf(a.ctx, "err writing image data: %s", err)
+		// 		}
+		// 		fw.Close()
+		// 		fr.Close()
+		// 	}
+		// }
 
-		err = beeep.Notify(
+		if err := beeep.Notify(
 			fmt.Sprintf("test result - %s", result),
 			"test finished. test "+result+"ED",
-			"/tmp/logo.png")
-		if err != nil {
+			"/tmp/logo.png"); err != nil {
 			runtime.LogWarningf(a.ctx, "err sending notification: %s", err)
 		}
 		stdout.Close()
