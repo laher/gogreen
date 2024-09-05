@@ -27,7 +27,7 @@ type App struct {
 	ctx     context.Context // wails requires a context.Context
 	watcher *fsnotify.Watcher
 	stop    chan struct{}
-	sync.RWMutex
+	lock    sync.RWMutex
 }
 
 // state to communicate to the frontend
@@ -82,8 +82,9 @@ func (a *App) Chdir() (string, error) {
 }
 
 func (a *App) GetState() (State, error) {
-	a.Lock()
-	defer a.Unlock()
+	// takes a write lock because it might update the state
+	a.lock.Lock()
+	defer a.lock.Unlock()
 	cmd := exec.Command("go", "list", "./...")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -113,8 +114,9 @@ type Package struct {
 
 // TODO cwd
 func (a *App) GetTestFuncs(p TestParams) ([]Package, error) {
-	a.Lock()
-	defer a.Unlock()
+	// takes a write lock
+	a.lock.Lock()
+	defer a.lock.Unlock()
 	// any test func
 	// (ignore example tests, benchmarks ...)
 	cmd := exec.Command("go", "test", "-list=Test", "-json", p.Pkg)
@@ -148,19 +150,19 @@ func (a *App) GetTestFuncs(p TestParams) ([]Package, error) {
 var images embed.FS
 
 func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
-	a.RLock()
-	alreadyWatching := a.state.Watching || a.watcher != nil
-	a.RUnlock()
-	if alreadyWatching {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	if a.state.Watching {
 		return nil, errors.New("already watching")
+	}
+	if a.watcher != nil {
+		panic("watcher should be nil when starting to watch")
 	}
 	var err error
 	a.watcher, err = fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
-	a.Lock()
-	defer a.Unlock()
 	a.watcher.Add(".")
 	a.state.Watching = true
 
@@ -170,16 +172,14 @@ func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
 			select {
 			case event, ok := <-a.watcher.Events:
 				if !ok {
+					// closed channel
 					return
 				}
-				a.RLock()
-				if a.state.Running {
-					a.RUnlock()
+				if a.isRunning() {
 					// debounce? ... in sime cases maybe set a flag saying we should start again right away?
 					runtime.LogDebugf(a.ctx, "ignore watch event (already running tests): %+v", event)
 					continue
 				}
-				a.RUnlock()
 				runtime.LogDebugf(a.ctx, "watch event: %+v", event)
 				s, err := a.Run(p)
 				if err != nil {
@@ -189,13 +189,14 @@ func (a *App) fsnotify(p TestParams) (*fsnotify.Watcher, error) {
 				runtime.LogDebugf(a.ctx, "ran tests: %s", s)
 			case err, ok := <-a.watcher.Errors:
 				if !ok {
+					// closed channel
 					return
 				}
 				runtime.LogErrorf(a.ctx, "watch error: %s", err)
 			case <-a.stop:
 				func() {
-					a.Lock()
-					defer a.Unlock()
+					a.lock.Lock()
+					defer a.lock.Unlock()
 					runtime.LogDebugf(a.ctx, "stop watching")
 					a.watcher = nil
 					a.state.Watching = false
@@ -217,25 +218,33 @@ func (a *App) Watch(p TestParams) (string, error) {
 }
 
 func (a *App) Unwatch() error {
-	a.RLock()
-	watching := a.state.Watching
-	a.RUnlock()
-	if !watching {
+	if !a.isWatching() {
 		return errors.New("not watching")
 	}
 	a.stop <- struct{}{}
 	return nil
 }
 
-func (a *App) setRunning(running bool) {
-	a.Lock()
-	defer a.Unlock()
-	a.state.Running = running
+func (a *App) isWatching() bool {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+	return a.state.Watching
+}
+
+func (a *App) isRunning() bool {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+	return a.state.Running
 }
 
 // Run returns a greeting for the given name
 func (a *App) Run(p TestParams) (string, error) {
-	a.setRunning(true)
+	if a.isRunning() {
+		return "", errors.New("already running")
+	}
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	a.state.Running = true
 	// count=1 to avoid caching
 	params := []string{"test", "-json", "-count=1"}
 	if p.Race {
@@ -263,12 +272,12 @@ func (a *App) Run(p TestParams) (string, error) {
 	// stdoutStderr, err := cmd.CombinedOutput()
 	// err = nil // ignore for now
 	if err != nil {
-		a.setRunning(false)
+		a.state.Running = false
 		return "", err
 	}
 	runtime.EventsEmit(a.ctx, "cls")
 
-	f := func(name string, i io.ReadCloser) {
+	emitOutput := func(name string, i io.ReadCloser) {
 		defer i.Close()
 		scanner := bufio.NewScanner(i)
 		// optionally, resize scanner's capacity for lines over 64K, see godoc
@@ -282,10 +291,15 @@ func (a *App) Run(p TestParams) (string, error) {
 		}
 		runtime.EventsEmit(a.ctx, "done."+name)
 	}
-	go f("stdout", stdout)
-	go f("stderr", stderr)
+	go emitOutput("stdout", stdout)
+	go emitOutput("stderr", stderr)
 	go func() {
-		defer a.setRunning(false)
+		// when run the tests - set 'not running' when done
+		defer func() {
+			a.lock.Lock()
+			defer a.lock.Unlock()
+			a.state.Running = false
+		}()
 		result := "PASS"
 		err := cmd.Wait()
 		if err != nil {

@@ -14,36 +14,8 @@ export function GetTestFuncs(arg1) {
   return window['go']['main']['App']['GetTestFuncs'](arg1);
 }
 
-export function Lock() {
-  return window['go']['main']['App']['Lock']();
-}
-
-export function RLock() {
-  return window['go']['main']['App']['RLock']();
-}
-
-export function RLocker() {
-  return window['go']['main']['App']['RLocker']();
-}
-
-export function RUnlock() {
-  return window['go']['main']['App']['RUnlock']();
-}
-
 export function Run(arg1) {
   return window['go']['main']['App']['Run'](arg1);
-}
-
-export function TryLock() {
-  return window['go']['main']['App']['TryLock']();
-}
-
-export function TryRLock() {
-  return window['go']['main']['App']['TryRLock']();
-}
-
-export function Unlock() {
-  return window['go']['main']['App']['Unlock']();
 }
 
 export function Unwatch() {
